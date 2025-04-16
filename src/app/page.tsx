@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -20,20 +19,70 @@ import { Label } from "@/components/ui/label";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarSeparator } from "@/components/ui/sidebar";
 import { Icons } from '@/components/icons';
 
-const auth = getAuth(app);
-
 export default function Home() {
-  const [user, loading, error] = useAuthState(auth);
+  const [user, loading, error] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
+  const [firebaseAuth, setFirebaseAuth] = useState<any>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing Firebase Auth...');
+        const authInstance = getAuth(app);
+        setFirebaseAuth(authInstance);
+        console.log('Firebase Auth initialized successfully.');
+      } catch (e: any) {
+        console.error('Error initializing Firebase Auth:', e.message);
+        setAuthError(e.message);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    if (app) {
+      initializeAuth();
+    } else {
+      console.warn('Firebase app not initialized.');
+      setAuthError('Firebase app not initialized.');
+      setAuthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && firebaseAuth) {
+      const unsubscribe = firebaseAuth.onAuthStateChanged(
+        (authUser) => {
+          if (authUser) {
+            console.log('User is signed in:', authUser);
+          } else {
+            console.log('No user is signed in.');
+          }
+          //setUser(authUser);
+        },
+        (err) => {
+          console.error('Auth state observer error:', err);
+          setAuthError(err.message);
+        }
+      );
+
+      return () => unsubscribe();
+    }
+  }, [authLoading, firebaseAuth]);
+
+  useEffect(() => {
+    if (!authLoading && !user && !authError) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router, authError]);
 
-  if (loading) {
+  if (authLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (authError) {
+    return <div>Error: {authError}</div>;
   }
 
   return (
@@ -57,22 +106,22 @@ export default function Home() {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
-            <Button variant="outline" onClick={() => signOut(auth)}>Logout</Button>
+            <Button variant="outline" onClick={() => firebaseAuth.signOut()}>Logout</Button>
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1 p-4">
           <h1 className="text-2xl font-bold mb-4">Welcome to ChirpChat</h1>
-          <GroupManagement />
+          <GroupManagement firebaseAuth={firebaseAuth}/>
         </div>
       </div>
     </SidebarProvider>
   );
 }
 
-function GroupManagement() {
+function GroupManagement({firebaseAuth}:any) {
   const [groupName, setGroupName] = useState('');
   const [groups, setGroups] = useState<any[]>([]); // Replace 'any' with your Group type if you have one
-  const [user, loading, error] = useAuthState(auth);
+  const [user, loading, error] = useAuthState(firebaseAuth);
 
   useEffect(() => {
     if (user) {
