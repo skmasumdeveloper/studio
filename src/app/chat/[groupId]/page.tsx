@@ -25,6 +25,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from '@/components/icons';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const PeerWithNoSSR = dynamic(() => import('peerjs').then((PeerJS) => PeerJS.Peer), {
+  ssr: false,
+  loading: () => <p>Loading PeerJS...</p>,
+});
 
 const auth = getAuth(app);
 
@@ -37,8 +43,15 @@ export default function ChatPage() {
   const lastMessageRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [groupName, setGroupName] = useState(''); // State to store group name
-
   const router = useRouter();
+
+    // WebRTC states
+    const [peerId, setPeerId] = useState<string | null>(null);
+    const [remotePeerIdValue, setRemotePeerIdValue] = useState('');
+    const myVideoRef = useRef<HTMLVideoElement>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+    const peerInstance = useRef<any>(null);
+    const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
   useEffect(() => {
     const messagesRef = collection(db, 'groups', groupId, 'messages');
@@ -98,11 +111,103 @@ export default function ChatPage() {
     }
   };
 
+    // WebRTC functions
+    useEffect(() => {
+      // Get camera permission
+      const getCameraPermission = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({video: true});
+          setHasCameraPermission(true);
+
+          if (myVideoRef.current) {
+            myVideoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to use this app.',
+          });
+        }
+      };
+
+      getCameraPermission();
+    }, [toast]);
+
+    useEffect(() => {
+        if (!user || !hasCameraPermission) return;
+
+        // Initialize PeerJS
+        const peer = new PeerWithNoSSR();
+
+        peer.on('open', (id: any) => {
+            setPeerId(id);
+            peerInstance.current = peer;
+        });
+
+        peer.on('call', async (call: any) => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                if (myVideoRef.current) {
+                    myVideoRef.current.srcObject = stream;
+                }
+
+                call.answer(stream);
+
+                call.on('stream', (remoteStream: any) => {
+                    if (remoteVideoRef.current) {
+                        remoteVideoRef.current.srcObject = remoteStream;
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to get local stream', err);
+            }
+        });
+
+        return () => {
+            peer.disconnect();
+            peer.destroy();
+        };
+    }, [user, hasCameraPermission]);
+
+    const call = async () => {
+        if (remotePeerIdValue === '' || !peerInstance.current) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Please enter a valid peer ID to call.',
+            });
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            if (myVideoRef.current) {
+                myVideoRef.current.srcObject = stream;
+            }
+
+            const call = peerInstance.current.call(remotePeerIdValue, stream);
+
+            call.on('stream', (remoteStream: any) => {
+                if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStream;
+                }
+            });
+        } catch (err) {
+            console.error('Failed to get local stream', err);
+        }
+    };
+
   return (
     <div className="flex flex-col h-screen">
       <Card className="flex-1 overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{groupName}</CardTitle>
+           <Button variant="outline" size="icon" onClick={call}>
+                <Icons.video className="h-4 w-4" />
+            </Button>
         </CardHeader>
         <CardContent className="h-full flex flex-col">
           <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
@@ -127,6 +232,32 @@ export default function ChatPage() {
               </div>
             </div>
           </ScrollArea>
+
+           <div className="p-4">
+                        {peerId && <Label>Your Peer ID: {peerId}</Label>}
+                        <div className="flex items-center space-x-2">
+                            <Input
+                                type="text"
+                                placeholder="Enter remote peer ID"
+                                value={remotePeerIdValue}
+                                onChange={(e) => setRemotePeerIdValue(e.target.value)}
+                            />
+                        </div>
+                    </div>
+            <div className="p-4 flex justify-center">
+                            <video ref={myVideoRef} className="w-64 h-48 rounded-md" autoPlay muted />
+                            <video ref={remoteVideoRef} className="w-64 h-48 rounded-md" autoPlay />
+
+                            { !(hasCameraPermission) && (
+                                <Alert variant="destructive">
+                                    <AlertTitle>Camera Access Required</AlertTitle>
+                                    <AlertDescription>
+                                        Please allow camera access to use this feature.
+                                    </AlertDescription>
+                                </Alert>
+                            )
+                            }
+                        </div>
           <div className="p-4 pb-24">
             <div className="flex space-x-2">
               <Input
