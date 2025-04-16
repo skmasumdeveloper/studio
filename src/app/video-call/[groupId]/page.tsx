@@ -56,7 +56,8 @@ export default function VideoCallPage() {
     let peer: any = null;
     const initializePeer = async () => {
       try {
-        peer = new PeerWithNoSSR();
+        const PeerJS = await import('peerjs');
+        peer = new PeerJS.Peer();
 
         peer.on('open', (id: any) => {
           setPeerId(id);
