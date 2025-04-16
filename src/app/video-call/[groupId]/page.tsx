@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase';
@@ -15,8 +15,10 @@ import {
     onSnapshot,
     updateDoc,
     arrayUnion,
+    arrayRemove,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Button } from "@/components/ui/button";
 
 const PeerWithNoSSR = dynamic(() => import('peerjs').then((PeerJS) => PeerJS.Peer), {
   ssr: false,
@@ -29,6 +31,7 @@ export default function VideoCallPage() {
   const [user] = useAuthState(auth);
   const { groupId } = useParams();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [peerId, setPeerId] = useState<string | null>(null);
   const myVideoRef = useRef<HTMLVideoElement>(null);
@@ -36,6 +39,7 @@ export default function VideoCallPage() {
   const peerInstance = useRef<any>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [remotePeerIds, setRemotePeerIds] = useState<string[]>([]);
+  const [isCallEnded, setIsCallEnded] = useState(false);
 
 
   useEffect(() => {
@@ -62,7 +66,7 @@ export default function VideoCallPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!user || !hasCameraPermission) return;
+    if (!user || !hasCameraPermission || isCallEnded) return;
 
     let peer: any = null;
     const initializePeer = async () => {
@@ -126,7 +130,7 @@ export default function VideoCallPage() {
         peer.destroy();
       }
     };
-  }, [user, hasCameraPermission, groupId, toast]);
+  }, [user, hasCameraPermission, groupId, toast, isCallEnded]);
 
     useEffect(() => {
         if (!peerId || !groupId) return;
@@ -137,8 +141,6 @@ export default function VideoCallPage() {
             if (doc.exists()) {
                 const data = doc.data();
                 const peerIds = data.peerIds || [];
-                // console.log('peerIds from snapshot: ', peerIds)
-                // console.log('peerId from snapshot: ', peerId)
 
                 // Filter out current peerId and update remotePeerIds state
                 const filteredPeerIds = peerIds.filter((id:string) => id !== peerId);
@@ -172,6 +174,26 @@ export default function VideoCallPage() {
     }
   };
 
+  const handleEndCall = async () => {
+    setIsCallEnded(true);
+
+    // Remove peer ID from Firestore
+    if (peerId && groupId) {
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        peerIds: arrayRemove(peerId)
+      });
+    }
+
+    if (peerInstance.current) {
+      peerInstance.current.disconnect();
+      peerInstance.current.destroy();
+    }
+
+    // Redirect to chat page
+    router.push(`/chat/${groupId}`);
+  };
+
 
   return (
     <div className="flex flex-col items-center justify-center h-screen">
@@ -190,6 +212,9 @@ export default function VideoCallPage() {
         </Alert>
       )
       }
+            <Button onClick={handleEndCall} className="mt-4">
+                End Call
+            </Button>
     </div>
   );
 }
