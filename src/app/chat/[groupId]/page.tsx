@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const auth = getAuth(app);
 
@@ -26,8 +27,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const { groupId } = useParams();
-  const scrollAreaRef = useRef(null);
-
+  const scrollAreaRef = useRef<any>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -50,7 +50,6 @@ export default function ChatPage() {
     // Scroll to bottom on new message
     const scrollArea = scrollAreaRef.current;
     if (scrollArea) {
-        // @ts-expect-error
       scrollArea.scrollTop = scrollArea.scrollHeight;
     }
   }, [messages]);
@@ -82,10 +81,18 @@ export default function ChatPage() {
         <CardContent className="h-full flex flex-col">
           <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
             {messages.map((msg) => (
-              <div key={msg.id} className={`mb-2 ${msg.uid === user?.uid ? 'text-right' : 'text-left'}`}>
-                <div className="text-xs text-muted-foreground">{msg.displayName}</div>
-                <div className={`inline-block p-2 rounded-lg ${msg.uid === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
-                  {msg.text}
+              <div key={msg.id} className={`mb-4 flex items-start ${msg.uid === user?.uid ? 'self-end text-right' : 'text-left'}`}>
+                {msg.uid !== user?.uid && (
+                  <Avatar className="mr-2 h-8 w-8">
+                    <AvatarImage src={`https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/50/50`} alt={msg.displayName} />
+                    <AvatarFallback>{msg.displayName?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                )}
+                <div>
+                  <div className="text-xs text-muted-foreground">{msg.displayName}</div>
+                  <div className={`inline-block p-2 rounded-lg ${msg.uid === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
+                    {msg.text}
+                  </div>
                 </div>
               </div>
             ))}
@@ -97,6 +104,11 @@ export default function ChatPage() {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Enter your message..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    sendMessage();
+                  }
+                }}
               />
               <Button onClick={sendMessage}>Send</Button>
             </div>

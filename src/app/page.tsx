@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   getAuth
 } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, updateDoc, arrayUnion, doc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import {initializeApp} from "firebase/app";
 
@@ -17,6 +17,17 @@ import { Label } from "@/components/ui/label";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarSeparator } from "@/components/ui/sidebar";
 import { Icons } from '@/components/icons';
 import Link from 'next/link';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const auth = getAuth(app);
 
@@ -77,6 +88,10 @@ function GroupManagement({auth}:any) {
   const [groupName, setGroupName] = useState('');
   const [groups, setGroups] = useState<any[]>([]); // Replace 'any' with your Group type if you have one
   const [user, loading, error] = useAuthState(auth);
+  const [open, setOpen] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [searchResult, setSearchResult] = useState<any | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -118,6 +133,54 @@ function GroupManagement({auth}:any) {
     }
   };
 
+  const handleOpenChange = (open: boolean, groupId: string) => {
+        setOpen(open);
+        setSelectedGroupId(groupId);
+    };
+    const handleClose = () => {
+        setOpen(false);
+        setSelectedGroupId(null);
+        setNewMemberEmail('');
+        setSearchResult(null);
+    };
+
+  const searchUserByEmail = async (email: string) => {
+        try {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('email', '==', email));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const userDoc = querySnapshot.docs[0];
+                setSearchResult({ id: userDoc.id, ...userDoc.data() });
+            } else {
+                setSearchResult(null);
+                alert('User not found.');
+            }
+        } catch (error) {
+            console.error('Error searching user: ', error);
+            setSearchResult(null);
+            alert('Error searching user.');
+        }
+    };
+
+    const addMemberToGroup = async () => {
+        if (!selectedGroupId || !searchResult?.id) return;
+
+        try {
+            const groupRef = doc(db, 'groups', selectedGroupId);
+            await updateDoc(groupRef, {
+                members: arrayUnion(searchResult.id)
+            });
+
+            console.log('User added to group');
+            handleClose();
+            fetchGroups(); // Refresh the group list
+        } catch (error) {
+            console.error('Error adding member to group: ', error);
+            alert('Error adding member to group.');
+        }
+    };
 
   return (
     <div className="space-y-4">
@@ -146,8 +209,52 @@ function GroupManagement({auth}:any) {
           {groups.length > 0 ? (
             <ul>
               {groups.map((group) => (
-                <li key={group.id} className="py-2">
+                <li key={group.id} className="py-2 flex items-center justify-between">
                   <Link href={`/chat/${group.id}`}>{group.name}</Link>
+                  <Dialog open={open && selectedGroupId === group.id} onOpenChange={(open) => handleOpenChange(open, group.id)}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="icon">
+                                <Icons.plusCircle className="h-4 w-4" />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Add Member</DialogTitle>
+                                <DialogDescription>
+                                    Search for a user by email to add them to the group.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="email" className="text-right">
+                                        Email
+                                    </Label>
+                                    <Input
+                                        type="email"
+                                        id="email"
+                                        value={newMemberEmail}
+                                        onChange={(e) => setNewMemberEmail(e.target.value)}
+                                        className="col-span-3"
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" onClick={() => searchUserByEmail(newMemberEmail)}>
+                                    Search User
+                                </Button>
+                                <Button type="button" onClick={addMemberToGroup} disabled={!searchResult}>
+                                    Add to Group
+                                </Button>
+                            </DialogFooter>
+                            {searchResult && (
+                                <div className="mt-4">
+                                    <p>User found:</p>
+                                    <p>Name: {searchResult.name}</p>
+                                    <p>Email: {searchResult.email}</p>
+                                </div>
+                            )}
+                        </DialogContent>
+                    </Dialog>
                 </li>
               ))}
             </ul>
