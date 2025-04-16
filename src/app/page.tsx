@@ -28,6 +28,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const auth = getAuth(app);
 
@@ -90,12 +91,15 @@ function GroupManagement({auth}:any) {
   const [user, loading, error] = useAuthState(auth);
   const [open, setOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [searchResult, setSearchResult] = useState<any | null>(null);
+  // const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (user) {
       fetchGroups();
+      fetchAvailableUsers();
     }
   }, [user]);
 
@@ -140,37 +144,30 @@ function GroupManagement({auth}:any) {
     const handleClose = () => {
         setOpen(false);
         setSelectedGroupId(null);
-        setNewMemberEmail('');
-        setSearchResult(null);
+        setSelectedUser(null);
     };
 
-  const searchUserByEmail = async (email: string) => {
+    const fetchAvailableUsers = async () => {
         try {
             const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', email));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const userDoc = querySnapshot.docs[0];
-                setSearchResult({ id: userDoc.id, ...userDoc.data() });
-            } else {
-                setSearchResult(null);
-                alert('User not found.');
-            }
+            const querySnapshot = await getDocs(usersRef);
+            const usersList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setAvailableUsers(usersList);
         } catch (error) {
-            console.error('Error searching user: ', error);
-            setSearchResult(null);
-            alert('Error searching user.');
+            console.error('Error fetching users: ', error);
         }
     };
 
-    const addMemberToGroup = async () => {
-        if (!selectedGroupId || !searchResult?.id) return;
+  const addMemberToGroup = async () => {
+        if (!selectedGroupId || !selectedUser) return;
 
         try {
             const groupRef = doc(db, 'groups', selectedGroupId);
             await updateDoc(groupRef, {
-                members: arrayUnion(searchResult.id)
+                members: arrayUnion(selectedUser)
             });
 
             console.log('User added to group');
@@ -221,38 +218,33 @@ function GroupManagement({auth}:any) {
                             <DialogHeader>
                                 <DialogTitle>Add Member</DialogTitle>
                                 <DialogDescription>
-                                    Search for a user by email to add them to the group.
+                                    Select a user to add them to the group.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
                                 <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="email" className="text-right">
-                                        Email
+                                    <Label htmlFor="user" className="text-right">
+                                        User
                                     </Label>
-                                    <Input
-                                        type="email"
-                                        id="email"
-                                        value={newMemberEmail}
-                                        onChange={(e) => setNewMemberEmail(e.target.value)}
-                                        className="col-span-3"
-                                    />
+                                    <Select onValueChange={setSelectedUser}>
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Select a user" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableUsers.map(user => (
+                                                <SelectItem key={user.id} value={user.id}>
+                                                    {user.name} ({user.email})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button type="button" onClick={() => searchUserByEmail(newMemberEmail)}>
-                                    Search User
-                                </Button>
-                                <Button type="button" onClick={addMemberToGroup} disabled={!searchResult}>
+                                <Button type="button" onClick={addMemberToGroup} disabled={!selectedUser}>
                                     Add to Group
                                 </Button>
                             </DialogFooter>
-                            {searchResult && (
-                                <div className="mt-4">
-                                    <p>User found:</p>
-                                    <p>Name: {searchResult.name}</p>
-                                    <p>Email: {searchResult.email}</p>
-                                </div>
-                            )}
                         </DialogContent>
                     </Dialog>
                 </li>

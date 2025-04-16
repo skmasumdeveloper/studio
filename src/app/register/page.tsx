@@ -1,14 +1,14 @@
-
 "use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { app } from '@/lib/firebase'; // Firebase configuration
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { app, db } from '@/lib/firebase'; // Firebase configuration
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { doc, setDoc } from 'firebase/firestore';
 
 const auth = getAuth(app);
 
@@ -22,7 +22,22 @@ export default function RegisterPage() {
   const handleRegister = async () => {
     setError(null);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      // Create user with email and password
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Update user profile with display name
+      await updateProfile(user, {
+        displayName: name,
+      });
+
+      // Store additional user data in Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      await setDoc(userDocRef, {
+        name: name,
+        email: email,
+      });
+
       router.push('/');
     } catch (e: any) {
       setError(e.message);
