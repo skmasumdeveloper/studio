@@ -16,6 +16,7 @@ import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarSeparator } from "@/components/ui/sidebar";
 import { Icons } from '@/components/icons';
+import Link from 'next/link';
 
 const auth = getAuth(app);
 
@@ -145,7 +146,9 @@ function GroupManagement({auth}:any) {
           {groups.length > 0 ? (
             <ul>
               {groups.map((group) => (
-                <li key={group.id} className="py-2">{group.name}</li>
+                <li key={group.id} className="py-2">
+                  <Link href={`/chat/${group.id}`}>{group.name}</Link>
+                </li>
               ))}
             </ul>
           ) : (
