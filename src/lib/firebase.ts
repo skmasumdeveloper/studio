@@ -4,13 +4,14 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: "AIzaSyAumjc1aUUcK1l0ejZJGZNs6N-KBcQ39bA",
+  authDomain: "chirpchat-cd606.firebaseapp.com",
+  projectId: "chirpchat-cd606",
+  storageBucket: "chirpchat-cd606.firebasestorage.app",
+  messagingSenderId: "457469946819",
+  appId: "1:457469946819:web:fa53ab43fe45ac5a05eb76",
+  measurementId: "G-GC3V8FX9HF"
 };
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);

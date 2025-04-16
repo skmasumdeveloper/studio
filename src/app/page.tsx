@@ -3,13 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
+  getAuth
 } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import {initializeApp} from "firebase/app";
 
 import { app, db } from '@/lib/firebase'; // Firebase configuration
 import { Button } from "@/components/ui/button";
@@ -18,7 +16,6 @@ import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarSeparator } from "@/components/ui/sidebar";
 import { Icons } from '@/components/icons';
-import {getFirebaseApiKey} from "@/ai/tools/get-firebase-api-key";
 
 export default function Home() {
   const [user, loading, error] = useState(null);
@@ -29,11 +26,14 @@ export default function Home() {
   const [apiKey, setApiKey] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchApiKey = async () => {
-      const {firebaseApiKey} = await getFirebaseApiKey({});
-      setApiKey(firebaseApiKey);
-    };
-    fetchApiKey();
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (apiKey) {
+      setApiKey(apiKey);
+    } else {
+      console.error('Firebase API key is missing from environment variables.');
+      setAuthError('Firebase API key is missing from environment variables.');
+      setAuthLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -54,10 +54,18 @@ export default function Home() {
           messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
           appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
         };
-        const app = initializeApp(firebaseConfig);
-        const authInstance = getAuth(app);
-        setFirebaseAuth(authInstance);
-        console.log('Firebase Auth initialized successfully.');
+        try {
+          const app = initializeApp(firebaseConfig);
+          const authInstance = getAuth(app);
+          setFirebaseAuth(authInstance);
+          console.log('Firebase Auth initialized successfully.');
+        } catch (e: any) {
+          console.error('Error initializing Firebase Auth with fetched key:', e.message);
+          setAuthError(`Firebase Auth initialization error: ${e.message}`);
+          setAuthLoading(false);
+          return;
+        }
+
       } catch (e: any) {
         console.error('Error initializing Firebase Auth:', e.message);
         setAuthError(e.message);
