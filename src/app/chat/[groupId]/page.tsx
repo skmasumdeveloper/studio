@@ -86,7 +86,7 @@ export default function ChatPage() {
                 <div key={msg.id} className={`mb-4 flex items-start ${msg.uid === user?.uid ? 'self-end text-right' : 'text-left'}`}>
                   {msg.uid !== user?.uid && (
                     <Avatar className="mr-2 h-8 w-8">
-                      <AvatarImage src={`https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/50/50`} alt={msg.displayName} />
+                      {/*  REMOVED RANDOM IMAGE AND ADDED FIRST LETTER OF USERNAME */}
                       <AvatarFallback>{msg.displayName?.charAt(0)}</AvatarFallback>
                     </Avatar>
                   )}
