@@ -17,105 +17,26 @@ import { Label } from "@/components/ui/label";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarSeparator } from "@/components/ui/sidebar";
 import { Icons } from '@/components/icons';
 
+const auth = getAuth(app);
+
 export default function Home() {
-  const [user, loading, error] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [user, loading, error] = useAuthState(auth);
   const router = useRouter();
-  const [firebaseAuth, setFirebaseAuth] = useState<any>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
+
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (apiKey) {
-      setApiKey(apiKey);
-    } else {
-      console.error('Firebase API key is missing from environment variables.');
-      setAuthError('Firebase API key is missing from environment variables.');
-      setAuthLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        console.log('Initializing Firebase Auth...');
-        if (!apiKey) {
-          console.error('Firebase API key is missing.');
-          setAuthError('Firebase API key is missing.');
-          setAuthLoading(false);
-          return;
-        }
-        const firebaseConfig = {
-          apiKey: apiKey,
-          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-        };
-        try {
-          const app = initializeApp(firebaseConfig);
-          const authInstance = getAuth(app);
-          setFirebaseAuth(authInstance);
-          console.log('Firebase Auth initialized successfully.');
-        } catch (e: any) {
-          console.error('Error initializing Firebase Auth with fetched key:', e.message);
-          setAuthError(`Firebase Auth initialization error: ${e.message}`);
-          setAuthLoading(false);
-          return;
-        }
-
-      } catch (e: any) {
-        console.error('Error initializing Firebase Auth:', e.message);
-        setAuthError(e.message);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    if (apiKey) {
-      initializeAuth();
-    } else {
-      console.warn('Firebase app not initialized.');
-      setAuthError('Firebase app not initialized.');
-      setAuthLoading(false);
-    }
-  }, [apiKey]);
-
-  useEffect(() => {
-    if (!authLoading && firebaseAuth) {
-      const unsubscribe = firebaseAuth.onAuthStateChanged(
-        (authUser) => {
-          if (authUser) {
-            console.log('User is signed in:', authUser);
-          } else {
-            console.log('No user is signed in.');
-          }
-          //setUser(authUser);
-        },
-        (err) => {
-          console.error('Auth state observer error:', err);
-          setAuthError(err.message);
-        }
-      );
-
-      return () => unsubscribe();
-    }
-  }, [authLoading, firebaseAuth]);
-
-  useEffect(() => {
-    if (!authLoading && !user && !authError) {
+    if (!loading && !user && !error) {
       router.push('/login');
     }
-  }, [user, authLoading, router, authError]);
+  }, [user, loading, router, error]);
 
-  if (authLoading) {
+
+  if (loading) {
     return <div>Loading...</div>;
   }
 
-  if (authError) {
-    return <div>Error: {authError}</div>;
+  if (error) {
+    return <div>Error: {error.message}</div>;
   }
 
   return (
@@ -139,22 +60,22 @@ export default function Home() {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
-            <Button variant="outline" onClick={() => firebaseAuth.signOut()}>Logout</Button>
+            <Button variant="outline" onClick={() => auth.signOut()}>Logout</Button>
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1 p-4">
           <h1 className="text-2xl font-bold mb-4">Welcome to ChirpChat</h1>
-          <GroupManagement firebaseAuth={firebaseAuth}/>
+          <GroupManagement auth={auth}/>
         </div>
       </div>
     </SidebarProvider>
   );
 }
 
-function GroupManagement({firebaseAuth}:any) {
+function GroupManagement({auth}:any) {
   const [groupName, setGroupName] = useState('');
   const [groups, setGroups] = useState<any[]>([]); // Replace 'any' with your Group type if you have one
-  const [user, loading, error] = useAuthState(firebaseAuth);
+  const [user, loading, error] = useAuthState(auth);
 
   useEffect(() => {
     if (user) {
