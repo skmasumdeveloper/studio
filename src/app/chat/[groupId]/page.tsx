@@ -33,13 +33,13 @@ export default function ChatPage() {
     if (!groupId) return;
 
     const messagesRef = collection(db, 'groups', groupId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt'));
+    const q = query(messagesRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-      }));
+      })).reverse();
       setMessages(messages);
     });
 
@@ -98,7 +98,7 @@ export default function ChatPage() {
             ))}
             <div style={{ marginBottom: '20px' }}></div>
           </ScrollArea>
-          <div className="p-4">
+          <div className="p-4 pb-10">
             <div className="flex space-x-2">
               <Input
                 type="text"
