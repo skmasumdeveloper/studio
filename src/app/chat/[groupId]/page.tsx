@@ -96,6 +96,7 @@ export default function ChatPage() {
                 </div>
               </div>
             ))}
+            <div style={{ marginBottom: '20px' }}></div>
           </ScrollArea>
           <div className="p-4">
             <div className="flex space-x-2">
