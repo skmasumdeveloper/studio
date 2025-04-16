@@ -24,7 +24,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from '@/components/icons';
-import {Peer} from 'peerjs'; // Import Peer from peerjs
+import Peer from 'peerjs'; // Import Peer from peerjs
 import { useRouter } from 'next/navigation';
 
 const auth = getAuth(app);
@@ -301,3 +301,5 @@ function VideoCall({ peerId, remotePeerIdValue, setRemotePeerIdValue, myVideoRef
         </div>
     );
 }
+
+
