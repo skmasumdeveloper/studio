@@ -18,6 +18,7 @@ import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarSeparator } from "@/components/ui/sidebar";
 import { Icons } from '@/components/icons';
+import {getFirebaseApiKey} from "@/ai/tools/get-firebase-api-key";
 
 export default function Home() {
   const [user, loading, error] = useState(null);
@@ -25,17 +26,35 @@ export default function Home() {
   const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
   const [firebaseAuth, setFirebaseAuth] = useState<any>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      const {firebaseApiKey} = await getFirebaseApiKey({});
+      setApiKey(firebaseApiKey);
+    };
+    fetchApiKey();
+  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         console.log('Initializing Firebase Auth...');
-        if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+        if (!apiKey) {
           console.error('Firebase API key is missing.');
           setAuthError('Firebase API key is missing.');
           setAuthLoading(false);
           return;
         }
+        const firebaseConfig = {
+          apiKey: apiKey,
+          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+        };
+        const app = initializeApp(firebaseConfig);
         const authInstance = getAuth(app);
         setFirebaseAuth(authInstance);
         console.log('Firebase Auth initialized successfully.');
@@ -47,14 +66,14 @@ export default function Home() {
       }
     };
 
-    if (app) {
+    if (apiKey) {
       initializeAuth();
     } else {
       console.warn('Firebase app not initialized.');
       setAuthError('Firebase app not initialized.');
       setAuthLoading(false);
     }
-  }, []);
+  }, [apiKey]);
 
   useEffect(() => {
     if (!authLoading && firebaseAuth) {
