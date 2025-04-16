@@ -28,18 +28,20 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const { groupId } = useParams();
   const scrollAreaRef = useRef<any>(null);
+  const lastMessageRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     if (!groupId) return;
 
     const messagesRef = collection(db, 'groups', groupId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'desc'));
+    const q = query(messagesRef, orderBy('createdAt'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-      })).reverse();
+      }));
       setMessages(messages);
     });
 
@@ -48,9 +50,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     // Scroll to bottom on new message
-    const scrollArea = scrollAreaRef.current;
-    if (scrollArea) {
-      scrollArea.scrollTop = scrollArea.scrollHeight;
+    if (lastMessageRef.current) {
+      lastMessageRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
@@ -80,25 +81,28 @@ export default function ChatPage() {
         </CardHeader>
         <CardContent className="h-full flex flex-col">
           <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`mb-4 flex items-start ${msg.uid === user?.uid ? 'self-end text-right' : 'text-left'}`}>
-                {msg.uid !== user?.uid && (
-                  <Avatar className="mr-2 h-8 w-8">
-                    <AvatarImage src={`https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/50/50`} alt={msg.displayName} />
-                    <AvatarFallback>{msg.displayName?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                )}
-                <div>
-                  <div className="text-xs text-muted-foreground">{msg.displayName}</div>
-                  <div className={`inline-block p-2 rounded-lg ${msg.uid === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
-                    {msg.text}
+            <div className="flex flex-col">
+              {messages.map((msg) => (
+                <div key={msg.id} className={`mb-4 flex items-start ${msg.uid === user?.uid ? 'self-end text-right' : 'text-left'}`}>
+                  {msg.uid !== user?.uid && (
+                    <Avatar className="mr-2 h-8 w-8">
+                      <AvatarImage src={`https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/50/50`} alt={msg.displayName} />
+                      <AvatarFallback>{msg.displayName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div>
+                    <div className="text-xs text-muted-foreground">{msg.displayName}</div>
+                    <div className={`inline-block p-2 rounded-lg ${msg.uid === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
+                      {msg.text}
+                    </div>
                   </div>
                 </div>
+              ))}
+              <div ref={lastMessageRef} style={{ float: "left", clear: "both" }}>
               </div>
-            ))}
-            <div style={{ marginBottom: '20px' }}></div>
+            </div>
           </ScrollArea>
-          <div className="p-4 pb-10">
+          <div className="p-4 pb-20">
             <div className="flex space-x-2">
               <Input
                 type="text"
