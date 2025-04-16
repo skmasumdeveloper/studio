@@ -27,10 +27,16 @@ import { Icons } from '@/components/icons';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-const PeerWithNoSSR = dynamic(() => import('peerjs').then((PeerJS) => PeerJS.Peer), {
-  ssr: false,
-  loading: () => <p>Loading PeerJS...</p>,
-});
+const PeerWithNoSSR = dynamic(
+  async () => {
+    const PeerJS = await import('peerjs');
+    return PeerJS.Peer;
+  },
+  {
+    ssr: false,
+    loading: () => <p>Loading PeerJS...</p>,
+  }
+);
 
 const auth = getAuth(app);
 
@@ -137,39 +143,50 @@ export default function ChatPage() {
     }, [toast]);
 
     useEffect(() => {
-        if (!user || !hasCameraPermission) return;
+      if (!user || !hasCameraPermission) return;
 
-        // Initialize PeerJS
-        const peer = new PeerWithNoSSR();
+      // Initialize PeerJS
+      let peer: any = null;
+      const initializePeer = async () => {
+        try {
+          peer = new PeerWithNoSSR();
 
-        peer.on('open', (id: any) => {
+          peer.on('open', (id: any) => {
             setPeerId(id);
             peerInstance.current = peer;
-        });
+          });
 
-        peer.on('call', async (call: any) => {
+          peer.on('call', async (call: any) => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                if (myVideoRef.current) {
-                    myVideoRef.current.srcObject = stream;
+              const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+              if (myVideoRef.current) {
+                myVideoRef.current.srcObject = stream;
+              }
+
+              call.answer(stream);
+
+              call.on('stream', (remoteStream: any) => {
+                if (remoteVideoRef.current) {
+                  remoteVideoRef.current.srcObject = remoteStream;
                 }
-
-                call.answer(stream);
-
-                call.on('stream', (remoteStream: any) => {
-                    if (remoteVideoRef.current) {
-                        remoteVideoRef.current.srcObject = remoteStream;
-                    }
-                });
+              });
             } catch (err) {
-                console.error('Failed to get local stream', err);
+              console.error('Failed to get local stream', err);
             }
-        });
+          });
+        } catch (error) {
+          console.error('Failed to initialize PeerJS', error);
+        }
+      };
 
-        return () => {
-            peer.disconnect();
-            peer.destroy();
-        };
+      initializePeer();
+
+      return () => {
+        if (peer) {
+          peer.disconnect();
+          peer.destroy();
+        }
+      };
     }, [user, hasCameraPermission]);
 
     const call = async () => {
@@ -279,4 +296,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
