@@ -26,17 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Icons } from '@/components/icons';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-
-const PeerWithNoSSR = dynamic(
-  async () => {
-    const PeerJS = await import('peerjs');
-    return PeerJS.Peer;
-  },
-  {
-    ssr: false,
-    loading: () => <p>Loading PeerJS...</p>,
-  }
-);
+import Peer from 'peerjs'; // Import Peer from peerjs
 
 const auth = getAuth(app);
 
@@ -149,7 +139,7 @@ export default function ChatPage() {
       let peer: any = null;
       const initializePeer = async () => {
         try {
-          peer = new PeerWithNoSSR();
+          peer = new Peer();
 
           peer.on('open', (id: any) => {
             setPeerId(id);
