@@ -30,6 +30,12 @@ export default function Home() {
     const initializeAuth = async () => {
       try {
         console.log('Initializing Firebase Auth...');
+        if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+          console.error('Firebase API key is missing.');
+          setAuthError('Firebase API key is missing.');
+          setAuthLoading(false);
+          return;
+        }
         const authInstance = getAuth(app);
         setFirebaseAuth(authInstance);
         console.log('Firebase Auth initialized successfully.');
