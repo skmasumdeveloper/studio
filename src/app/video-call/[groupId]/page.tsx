@@ -8,6 +8,15 @@ import { app } from '@/lib/firebase';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from 'next/dynamic';
+import {
+    collection,
+    doc,
+    getDoc,
+    onSnapshot,
+    updateDoc,
+    arrayUnion,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const PeerWithNoSSR = dynamic(() => import('peerjs').then((PeerJS) => PeerJS.Peer), {
   ssr: false,
@@ -26,6 +35,8 @@ export default function VideoCallPage() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerInstance = useRef<any>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [remotePeerIds, setRemotePeerIds] = useState<string[]>([]);
+
 
   useEffect(() => {
     const getCameraPermission = async () => {
@@ -59,12 +70,29 @@ export default function VideoCallPage() {
         const PeerJS = await import('peerjs');
         peer = new PeerJS.Peer();
 
-        peer.on('open', (id: any) => {
+        peer.on('open', async (id: any) => {
           setPeerId(id);
           peerInstance.current = peer;
 
-          // Attempt to connect to existing peers in the group
-          autoConnectToPeer(peer, groupId as string);
+          // Add peer ID to Firestore
+          const groupRef = doc(db, 'groups', groupId as string);
+          await updateDoc(groupRef, {
+            peerIds: arrayUnion(id)
+          });
+
+          // Get existing peer IDs from Firestore and connect
+          const groupDoc = await getDoc(groupRef);
+          if (groupDoc.exists()) {
+              const data = groupDoc.data();
+              const existingPeerIds = data.peerIds || [];
+              setRemotePeerIds(existingPeerIds);
+              existingPeerIds.forEach(peerId => {
+                if (peerId !== id) {
+                  connectToPeer(peer, peerId);
+                }
+              });
+          }
+
         });
 
         peer.on('call', async (call: any) => {
@@ -100,46 +128,50 @@ export default function VideoCallPage() {
     };
   }, [user, hasCameraPermission, groupId, toast]);
 
-  const autoConnectToPeer = async (peer: any, groupId: string) => {
-    // Basic logic to connect to a peer - improve this for production
+    useEffect(() => {
+        if (!peerId || !groupId) return;
+
+        const groupRef = doc(db, 'groups', groupId);
+
+        const unsubscribe = onSnapshot(groupRef, (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                const peerIds = data.peerIds || [];
+                // console.log('peerIds from snapshot: ', peerIds)
+                // console.log('peerId from snapshot: ', peerId)
+
+                // Filter out current peerId and update remotePeerIds state
+                const filteredPeerIds = peerIds.filter((id:string) => id !== peerId);
+                setRemotePeerIds(filteredPeerIds);
+            }
+        });
+        return () => unsubscribe();
+    }, [peerId, groupId]);
+
+
+  const connectToPeer = async (peer: any, peerId: string) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       if (myVideoRef.current) {
-          myVideoRef.current.srcObject = stream;
+        myVideoRef.current.srcObject = stream;
       }
 
-      // Here you would fetch existing peer IDs from Firestore for the group
-      // For simplicity, let's assume you have a function to do this
-      const existingPeerIds = await getExistingPeerIds(groupId);
+      console.log('Calling peer ID: ', peerId);
+      const call = peer.call(peerId, stream);
 
-      existingPeerIds.forEach(peerId => {
-        if (peerId !== peer.id) { // Don't call yourself
-            console.log('Calling peer ID: ', peerId);
-            const call = peer.call(peerId, stream);
-
-            call.on('stream', (remoteStream: any) => {
-                if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = remoteStream;
-                }
-            });
+      call.on('stream', (remoteStream: any) => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
         }
-    });
+      });
+      call.on('error', (err:any) => {
+        console.error('Call stream error', err);
+      });
     } catch (err) {
       console.error('Failed to get local stream', err);
     }
   };
 
-  const getExistingPeerIds = async (groupId: string): Promise<string[]> => {
-    // Replace this with your actual Firestore retrieval logic
-    // This is just a placeholder to simulate fetching peer IDs
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Simulate fetching peer IDs from Firestore
-        const peerIds = ['test-peer-id-1', 'test-peer-id-2']; // Replace with actual peer IDs
-        resolve(peerIds);
-      }, 1000); // Simulate network latency
-    });
-  };
 
   return (
     <div className="flex flex-col items-center justify-center h-screen">
